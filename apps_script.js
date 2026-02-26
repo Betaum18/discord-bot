@@ -23,6 +23,30 @@ function doGet(e) {
       if (valores[i][0] != "") lista.push(valores[i][0]);
     }
     return ContentService.createTextOutput(JSON.stringify(lista)).setMimeType(ContentService.MimeType.JSON);
+
+  } else if (data.aba == "RemoverVendedor") {
+    var ws4 = ss.getSheetByName("Vendedores");
+    if (ws4) {
+      var rows = ws4.getDataRange().getValues();
+      for (var i = 1; i < rows.length; i++) {
+        if (rows[i][0] == data.nome) {
+          ws4.deleteRow(i + 1);
+          break;
+        }
+      }
+    }
+
+  } else if (data.aba == "EditarVendedor") {
+    var ws5 = ss.getSheetByName("Vendedores");
+    if (ws5) {
+      var rows2 = ws5.getDataRange().getValues();
+      for (var i = 1; i < rows2.length; i++) {
+        if (rows2[i][0] == data.nome_atual) {
+          ws5.getRange(i + 1, 1).setValue(data.nome_novo);
+          break;
+        }
+      }
+    }
   }
 
   return ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON);

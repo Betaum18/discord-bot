@@ -166,6 +166,105 @@ async def vendedor(interaction: discord.Interaction, nome: str):
         await interaction.followup.send(f'❌ Erro ao cadastrar vendedor: {e}', ephemeral=True)
 
 
+# ── REMOVER VENDEDOR ──────────────────────────────────────────────────────────
+
+class RemoverVendedorSelect(discord.ui.Select):
+    def __init__(self, vendedores: list):
+        options = [discord.SelectOption(label=v, value=v) for v in vendedores]
+        super().__init__(placeholder='Selecione o vendedor para remover...', min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        nome = self.values[0]
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await sheets_request({'aba': 'RemoverVendedor', 'nome': nome})
+            await interaction.followup.send(f'✅ Vendedor **{nome}** removido com sucesso!', ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f'❌ Erro ao remover vendedor: {e}', ephemeral=True)
+
+
+class RemoverVendedorView(discord.ui.View):
+    def __init__(self, vendedores: list):
+        super().__init__()
+        self.add_item(RemoverVendedorSelect(vendedores))
+
+
+@bot.tree.command(name='vendedor_remover', description='Remove um vendedor cadastrado')
+async def vendedor_remover(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    try:
+        vendedores = await sheets_get_vendedores()
+    except Exception as e:
+        await interaction.followup.send(f'❌ Erro ao conectar ao Google Sheets: {e}', ephemeral=True)
+        return
+
+    if not vendedores:
+        await interaction.followup.send('❌ Nenhum vendedor cadastrado.', ephemeral=True)
+        return
+
+    await interaction.followup.send('Selecione o vendedor para remover:', view=RemoverVendedorView(vendedores), ephemeral=True)
+
+
+# ── EDITAR VENDEDOR ───────────────────────────────────────────────────────────
+
+class EditarVendedorModal(discord.ui.Modal, title='Editar Vendedor'):
+    def __init__(self, nome_atual: str):
+        super().__init__()
+        self.nome_atual = nome_atual
+        self.novo_nome = discord.ui.TextInput(
+            label='Novo Nome',
+            default=nome_atual,
+            required=True,
+        )
+        self.add_item(self.novo_nome)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await sheets_request({
+                'aba': 'EditarVendedor',
+                'nome_atual': self.nome_atual,
+                'nome_novo': self.novo_nome.value,
+            })
+            await interaction.followup.send(
+                f'✅ Vendedor **{self.nome_atual}** renomeado para **{self.novo_nome.value}**!',
+                ephemeral=True,
+            )
+        except Exception as e:
+            await interaction.followup.send(f'❌ Erro ao editar vendedor: {e}', ephemeral=True)
+
+
+class EditarVendedorSelect(discord.ui.Select):
+    def __init__(self, vendedores: list):
+        options = [discord.SelectOption(label=v, value=v) for v in vendedores]
+        super().__init__(placeholder='Selecione o vendedor para editar...', min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(EditarVendedorModal(self.values[0]))
+
+
+class EditarVendedorView(discord.ui.View):
+    def __init__(self, vendedores: list):
+        super().__init__()
+        self.add_item(EditarVendedorSelect(vendedores))
+
+
+@bot.tree.command(name='vendedor_editar', description='Edita o nome de um vendedor cadastrado')
+async def vendedor_editar(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    try:
+        vendedores = await sheets_get_vendedores()
+    except Exception as e:
+        await interaction.followup.send(f'❌ Erro ao conectar ao Google Sheets: {e}', ephemeral=True)
+        return
+
+    if not vendedores:
+        await interaction.followup.send('❌ Nenhum vendedor cadastrado.', ephemeral=True)
+        return
+
+    await interaction.followup.send('Selecione o vendedor para editar:', view=EditarVendedorView(vendedores), ephemeral=True)
+
+
 # ── BOT ───────────────────────────────────────────────────────────────────────
 
 @bot.tree.error
