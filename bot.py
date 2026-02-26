@@ -10,7 +10,7 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-APPS_SCRIPT_URL = os.environ['APPS_SCRIPT_URL']
+APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2tywG42XA7R8bFq_XPF-S2QjU5eTKpDBa59KnNukWfpPOXU3UJIR-emVvMZURuK0O/exec'
 
 
 async def sheets_post(payload: dict):
