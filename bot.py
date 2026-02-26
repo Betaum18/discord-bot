@@ -15,13 +15,25 @@ APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2tywG42XA7R8bFq_XPF
 
 async def sheets_post(payload: dict):
     async with aiohttp.ClientSession() as session:
-        async with session.post(APPS_SCRIPT_URL, json=payload) as resp:
-            return await resp.json(content_type=None)
+        # Google Apps Script redireciona o POST para GET — seguimos o redirect mantendo POST
+        async with session.post(APPS_SCRIPT_URL, json=payload, allow_redirects=False) as resp:
+            if resp.status in (301, 302, 303, 307, 308):
+                redirect_url = resp.headers['Location']
+                async with session.post(redirect_url, json=payload) as resp2:
+                    text = await resp2.text()
+                    print(f'sheets_post resposta: {text}')
+                    return
+            text = await resp.text()
+            print(f'sheets_post resposta: {text}')
 
 
 async def sheets_get_vendedores() -> list:
     async with aiohttp.ClientSession() as session:
-        async with session.post(APPS_SCRIPT_URL, json={"aba": "LerVendedores"}) as resp:
+        async with session.post(APPS_SCRIPT_URL, json={"aba": "LerVendedores"}, allow_redirects=False) as resp:
+            if resp.status in (301, 302, 303, 307, 308):
+                redirect_url = resp.headers['Location']
+                async with session.post(redirect_url, json={"aba": "LerVendedores"}) as resp2:
+                    return await resp2.json(content_type=None)
             return await resp.json(content_type=None)
 
 
