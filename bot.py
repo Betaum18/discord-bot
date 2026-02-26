@@ -281,8 +281,11 @@ async def on_app_command_error(interaction: discord.Interaction, error: discord.
 
 @bot.event
 async def on_ready():
+    for guild in bot.guilds:
+        bot.tree.copy_global_to(guild=guild)
+        await bot.tree.sync(guild=guild)
     synced = await bot.tree.sync()
-    print(f'Bot conectado como {bot.user} | {len(synced)} comandos sincronizados')
+    print(f'Bot conectado como {bot.user} | {len(synced)} comandos sincronizados em {len(bot.guilds)} servidor(es)')
 
 
 bot.run(os.environ['DISCORD_TOKEN'])
