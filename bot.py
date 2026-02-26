@@ -178,10 +178,22 @@ async def vendedor(interaction: discord.Interaction, nome: str):
 
 # ── BOT ───────────────────────────────────────────────────────────────────────
 
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+    print(f'[ERRO COMANDO] {interaction.command.name if interaction.command else "?"}: {error}')
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f'❌ Erro: {error}', ephemeral=True)
+        else:
+            await interaction.followup.send(f'❌ Erro: {error}', ephemeral=True)
+    except Exception as e:
+        print(f'[ERRO AO ENVIAR MENSAGEM DE ERRO] {e}')
+
+
 @bot.event
 async def on_ready():
-    await bot.tree.sync()
-    print(f'Bot conectado como {bot.user}')
+    synced = await bot.tree.sync()
+    print(f'Bot conectado como {bot.user} | {len(synced)} comandos sincronizados')
 
 
 bot.run(os.environ['DISCORD_TOKEN'])
