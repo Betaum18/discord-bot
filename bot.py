@@ -13,28 +13,18 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2tywG42XA7R8bFq_XPF-S2QjU5eTKpDBa59KnNukWfpPOXU3UJIR-emVvMZURuK0O/exec'
 
 
-async def sheets_post(payload: dict):
+async def sheets_request(payload: dict):
+    params = {'data': json.dumps(payload, ensure_ascii=False)}
     async with aiohttp.ClientSession() as session:
-        # Google Apps Script redireciona o POST para GET — seguimos o redirect mantendo POST
-        async with session.post(APPS_SCRIPT_URL, json=payload, allow_redirects=False) as resp:
-            if resp.status in (301, 302, 303, 307, 308):
-                redirect_url = resp.headers['Location']
-                async with session.post(redirect_url, json=payload) as resp2:
-                    text = await resp2.text()
-                    print(f'sheets_post resposta: {text}')
-                    return
+        async with session.get(APPS_SCRIPT_URL, params=params) as resp:
             text = await resp.text()
-            print(f'sheets_post resposta: {text}')
+            print(f'sheets resposta: {text}')
+            return json.loads(text) if text.strip() else None
 
 
 async def sheets_get_vendedores() -> list:
-    async with aiohttp.ClientSession() as session:
-        async with session.post(APPS_SCRIPT_URL, json={"aba": "LerVendedores"}, allow_redirects=False) as resp:
-            if resp.status in (301, 302, 303, 307, 308):
-                redirect_url = resp.headers['Location']
-                async with session.post(redirect_url, json={"aba": "LerVendedores"}) as resp2:
-                    return await resp2.json(content_type=None)
-            return await resp.json(content_type=None)
+    result = await sheets_request({'aba': 'LerVendedores'})
+    return result if isinstance(result, list) else []
 
 
 # ── LAVAGEM ───────────────────────────────────────────────────────────────────
@@ -95,7 +85,7 @@ class VendaModal(discord.ui.Modal, title='Registro de Venda'):
         await interaction.response.defer(ephemeral=False)
         try:
             registrado_em = datetime.now().strftime('%d/%m/%Y %H:%M')
-            await sheets_post({
+            await sheets_request({
                 'aba': 'Vendas',
                 'nome': self.nome.value,
                 'data': self.data.value,
@@ -166,7 +156,7 @@ async def vendedor(interaction: discord.Interaction, nome: str):
             await interaction.followup.send(f'❌ Vendedor **{nome}** já está cadastrado.', ephemeral=True)
             return
 
-        await sheets_post({
+        await sheets_request({
             'aba': 'Vendedores',
             'nome': nome,
             'data': datetime.now().strftime('%d/%m/%Y %H:%M'),
