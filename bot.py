@@ -265,6 +265,69 @@ async def vendedor_editar(interaction: discord.Interaction):
     await interaction.followup.send('Selecione o vendedor para editar:', view=EditarVendedorView(vendedores), ephemeral=True)
 
 
+# ── CRAFT ────────────────────────────────────────────────────────────────────
+
+async def sheets_get_craft_itens() -> list:
+    result = await sheets_request({'aba': 'LerCraftItens'})
+    return result if isinstance(result, list) else []
+
+
+async def sheets_get_craft(item: str) -> list:
+    result = await sheets_request({'aba': 'LerCraft', 'item': item})
+    return result if isinstance(result, list) else []
+
+
+async def craft_autocomplete(interaction: discord.Interaction, current: str) -> list:
+    try:
+        itens = await sheets_get_craft_itens()
+    except Exception:
+        return []
+    filtered = [i for i in itens if current.lower() in i.lower()]
+    return [discord.app_commands.Choice(name=i, value=i) for i in filtered[:25]]
+
+
+@bot.tree.command(name='craft', description='Mostra os materiais necessários para craftar um item')
+@discord.app_commands.describe(item='Nome do item (ex: M1911)')
+@discord.app_commands.autocomplete(item=craft_autocomplete)
+async def craft(interaction: discord.Interaction, item: str):
+    await interaction.response.defer()
+    try:
+        materiais = await sheets_get_craft(item)
+    except Exception as e:
+        await interaction.followup.send(f'❌ Erro ao buscar craft: {e}', ephemeral=True)
+        return
+
+    if not materiais:
+        await interaction.followup.send(
+            f'❌ Item **{item}** não encontrado. Use `/craft_lista` para ver os itens disponíveis.',
+            ephemeral=True,
+        )
+        return
+
+    lista = '\n'.join(f'• **{m["material"]}** — {m["quantidade"]}x' for m in materiais)
+    embed = discord.Embed(title=f'🔧 Craft: {item}', description=lista, color=0xE67E22)
+    embed.set_footer(text='Dados da planilha de crafts')
+    await interaction.followup.send(embed=embed)
+
+
+@bot.tree.command(name='craft_lista', description='Lista todos os itens disponíveis para craft')
+async def craft_lista(interaction: discord.Interaction):
+    await interaction.response.defer()
+    try:
+        itens = await sheets_get_craft_itens()
+    except Exception as e:
+        await interaction.followup.send(f'❌ Erro ao buscar itens: {e}', ephemeral=True)
+        return
+
+    if not itens:
+        await interaction.followup.send('❌ Nenhum item cadastrado na planilha de crafts.', ephemeral=True)
+        return
+
+    lista = '\n'.join(f'• {i}' for i in sorted(itens))
+    embed = discord.Embed(title='📋 Itens Disponíveis para Craft', description=lista, color=0xE67E22)
+    await interaction.followup.send(embed=embed)
+
+
 # ── BOT ───────────────────────────────────────────────────────────────────────
 
 @bot.tree.error

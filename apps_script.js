@@ -36,6 +36,33 @@ function doGet(e) {
       }
     }
 
+  } else if (data.aba == "LerCraftItens") {
+    var wsCraft = ss.getSheetByName("Crafts");
+    if (!wsCraft || wsCraft.getLastRow() <= 1) {
+      return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+    }
+    var dados = wsCraft.getRange(2, 1, wsCraft.getLastRow() - 1, 1).getValues();
+    var itens = [];
+    for (var i = 0; i < dados.length; i++) {
+      var nome = dados[i][0].toString().trim();
+      if (nome != "" && itens.indexOf(nome) == -1) itens.push(nome);
+    }
+    return ContentService.createTextOutput(JSON.stringify(itens)).setMimeType(ContentService.MimeType.JSON);
+
+  } else if (data.aba == "LerCraft") {
+    var wsCraft2 = ss.getSheetByName("Crafts");
+    if (!wsCraft2 || wsCraft2.getLastRow() <= 1) {
+      return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+    }
+    var todos = wsCraft2.getRange(2, 1, wsCraft2.getLastRow() - 1, 3).getValues();
+    var materiais = [];
+    for (var i = 0; i < todos.length; i++) {
+      if (todos[i][0].toString().trim().toLowerCase() == data.item.toLowerCase()) {
+        materiais.push({ material: todos[i][1], quantidade: todos[i][2] });
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify(materiais)).setMimeType(ContentService.MimeType.JSON);
+
   } else if (data.aba == "EditarVendedor") {
     var ws5 = ss.getSheetByName("Vendedores");
     if (ws5) {
