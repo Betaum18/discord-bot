@@ -287,9 +287,13 @@ async def craft_autocomplete(interaction: discord.Interaction, current: str) -> 
 
 
 @bot.tree.command(name='craft', description='Mostra os materiais necessários para craftar um item')
-@discord.app_commands.describe(item='Nome do item (ex: M1911)')
+@discord.app_commands.describe(item='Nome do item (ex: M1911)', quantidade='Quantidade a craftar (padrão: 1)')
 @discord.app_commands.autocomplete(item=craft_autocomplete)
-async def craft(interaction: discord.Interaction, item: str):
+async def craft(interaction: discord.Interaction, item: str, quantidade: int = 1):
+    if quantidade < 1:
+        await interaction.response.send_message('❌ A quantidade deve ser pelo menos 1.', ephemeral=True)
+        return
+
     await interaction.response.defer()
     try:
         materiais = await sheets_get_craft(item)
@@ -304,8 +308,9 @@ async def craft(interaction: discord.Interaction, item: str):
         )
         return
 
-    lista = '\n'.join(f'• **{m["material"]}** — {m["quantidade"]}x' for m in materiais)
-    embed = discord.Embed(title=f'🔧 Craft: {item}', description=lista, color=0xE67E22)
+    lista = '\n'.join(f'• **{m["material"]}** — {m["quantidade"] * quantidade}x' for m in materiais)
+    titulo = f'🔧 Craft: {item}' if quantidade == 1 else f'🔧 Craft: {item} ×{quantidade}'
+    embed = discord.Embed(title=titulo, description=lista, color=0xE67E22)
     embed.set_footer(text='Dados da planilha de crafts')
     await interaction.followup.send(embed=embed)
 
