@@ -308,7 +308,14 @@ async def craft(interaction: discord.Interaction, item: str, quantidade: int = 1
         )
         return
 
-    lista = '\n'.join(f'• **{m["material"]}** — {m["quantidade"] * quantidade}x' for m in materiais)
+    try:
+        lista = '\n'.join(
+            f'• **{m["material"]}** — {int(m["quantidade"]) * quantidade}x' for m in materiais
+        )
+    except Exception as e:
+        await interaction.followup.send(f'❌ Erro ao calcular materiais: {e}', ephemeral=True)
+        return
+
     titulo = f'🔧 Craft: {item}' if quantidade == 1 else f'🔧 Craft: {item} ×{quantidade}'
     embed = discord.Embed(title=titulo, description=lista, color=0xE67E22)
     embed.set_footer(text='Dados da planilha de crafts')
