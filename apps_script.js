@@ -74,6 +74,34 @@ function doGet(e) {
         }
       }
     }
+
+  } else if (data.aba == "CadastrarAniversario") {
+    var wsAniv = ss.getSheetByName("Aniversarios") || ss.insertSheet("Aniversarios");
+    if (wsAniv.getLastRow() == 0) wsAniv.appendRow(["Nome", "Discord_ID", "Data"]);
+    var rowsAniv = wsAniv.getLastRow() > 1 ? wsAniv.getRange(2, 1, wsAniv.getLastRow() - 1, 3).getValues() : [];
+    var found = false;
+    for (var i = 0; i < rowsAniv.length; i++) {
+      if (String(rowsAniv[i][1]) == String(data.discord_id)) {
+        wsAniv.getRange(i + 2, 1, 1, 3).setValues([[data.nome, data.discord_id, data.data]]);
+        found = true;
+        break;
+      }
+    }
+    if (!found) wsAniv.appendRow([data.nome, data.discord_id, data.data]);
+
+  } else if (data.aba == "LerAniversarios") {
+    var wsAniv2 = ss.getSheetByName("Aniversarios");
+    if (!wsAniv2 || wsAniv2.getLastRow() <= 1) {
+      return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+    }
+    var valoresAniv = wsAniv2.getRange(2, 1, wsAniv2.getLastRow() - 1, 3).getValues();
+    var listaAniv = [];
+    for (var i = 0; i < valoresAniv.length; i++) {
+      if (valoresAniv[i][0] != "") {
+        listaAniv.push({nome: valoresAniv[i][0], discord_id: String(valoresAniv[i][1]), data: valoresAniv[i][2]});
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify(listaAniv)).setMimeType(ContentService.MimeType.JSON);
   }
 
   return ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON);

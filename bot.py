@@ -1,6 +1,7 @@
 import os
+import re
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from datetime import datetime
 import aiohttp
 import json
@@ -11,6 +12,9 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2tywG42XA7R8bFq_XPF-S2QjU5eTKpDBa59KnNukWfpPOXU3UJIR-emVvMZURuK0O/exec'
+CANAL_ANIVERSARIO = 'chat-vendetta'
+
+_aniversarios_enviados: dict[str, str] = {}  # {discord_id: 'DD/MM do dia enviado'}
 
 
 async def sheets_request(payload: dict):
@@ -24,6 +28,11 @@ async def sheets_request(payload: dict):
 
 async def sheets_get_vendedores() -> list:
     result = await sheets_request({'aba': 'LerVendedores'})
+    return result if isinstance(result, list) else []
+
+
+async def sheets_get_aniversarios() -> list:
+    result = await sheets_request({'aba': 'LerAniversarios'})
     return result if isinstance(result, list) else []
 
 
@@ -340,6 +349,59 @@ async def craft_lista(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
+# ── ANIVERSÁRIOS ──────────────────────────────────────────────────────────────
+
+@tasks.loop(hours=4)
+async def verificar_aniversarios():
+    hoje = datetime.now().strftime('%d/%m')
+    aniversarios = await sheets_get_aniversarios()
+    for a in aniversarios:
+        if a.get('data') != hoje:
+            continue
+        discord_id = str(a.get('discord_id', ''))
+        if _aniversarios_enviados.get(discord_id) == hoje:
+            continue
+        for guild in bot.guilds:
+            canal = discord.utils.get(guild.text_channels, name=CANAL_ANIVERSARIO)
+            if not canal:
+                continue
+            membro = guild.get_member(int(discord_id))
+            mencao = membro.mention if membro else a.get('nome', 'alguém')
+            await canal.send(f'🎂🎉 Hoje é aniversário de {mencao}! Feliz aniversário! 🎊🥳')
+        _aniversarios_enviados[discord_id] = hoje
+
+
+@verificar_aniversarios.before_loop
+async def before_verificar():
+    await bot.wait_until_ready()
+
+
+@bot.tree.command(name='aniversario', description='Cadastra o aniversário de um membro')
+@discord.app_commands.describe(usuario='Membro do servidor', data='Data no formato DD/MM')
+async def aniversario(interaction: discord.Interaction, usuario: discord.Member, data: str):
+    await interaction.response.defer(ephemeral=True)
+    if not re.match(r'^\d{2}/\d{2}$', data):
+        await interaction.followup.send('❌ Formato de data inválido. Use DD/MM (ex: 25/12).', ephemeral=True)
+        return
+    dia, mes = int(data[:2]), int(data[3:])
+    if not (1 <= dia <= 31 and 1 <= mes <= 12):
+        await interaction.followup.send('❌ Data inválida. Dia deve ser 01-31 e mês 01-12.', ephemeral=True)
+        return
+    try:
+        await sheets_request({
+            'aba': 'CadastrarAniversario',
+            'nome': usuario.display_name,
+            'discord_id': str(usuario.id),
+            'data': data,
+        })
+        await interaction.followup.send(
+            f'✅ Aniversário de **{usuario.display_name}** cadastrado para **{data}**!',
+            ephemeral=True,
+        )
+    except Exception as e:
+        await interaction.followup.send(f'❌ Erro ao cadastrar aniversário: {e}', ephemeral=True)
+
+
 # ── BOT ───────────────────────────────────────────────────────────────────────
 
 @bot.tree.error
@@ -361,6 +423,7 @@ async def on_ready():
         await bot.tree.sync(guild=guild)
     synced = await bot.tree.sync()
     print(f'Bot conectado como {bot.user} | {len(synced)} comandos sincronizados em {len(bot.guilds)} servidor(es)')
+    verificar_aniversarios.start()
 
 
 bot.run(os.environ['DISCORD_TOKEN'])
