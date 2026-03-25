@@ -4,6 +4,8 @@ import discord
 from discord.ext import commands, tasks
 from datetime import datetime
 import aiohttp
+from aiohttp import web
+import asyncio
 import json
 
 intents = discord.Intents.default()
@@ -426,4 +428,19 @@ async def on_ready():
     verificar_aniversarios.start()
 
 
-bot.run(os.environ['DISCORD_TOKEN'])
+async def health_check(request):
+    return web.Response(text="OK")
+
+async def start_webserver():
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+
+async def main():
+    await start_webserver()
+    await bot.start(os.environ['DISCORD_TOKEN'])
+
+asyncio.run(main())
