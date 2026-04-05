@@ -351,6 +351,80 @@ async def craft_lista(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
+# ── COMPRAS ───────────────────────────────────────────────────────────────────
+
+class CompraModal(discord.ui.Modal, title='Registro de Compra'):
+    item = discord.ui.TextInput(label='Item Comprado', placeholder='Ex: AK-47, Colete, Droga X', required=True)
+    quantidade = discord.ui.TextInput(label='Quantidade', placeholder='Ex: 5', required=True)
+    valor = discord.ui.TextInput(label='Valor Pago (R$)', placeholder='Ex: 15000', required=True)
+    observacao = discord.ui.TextInput(label='Observação (opcional)', placeholder='Ex: Comprado do NPC, fornecedor etc.', required=False)
+
+    def __init__(self, comprador: str):
+        super().__init__()
+        self.comprador = comprador
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        try:
+            registrado_em = datetime.now().strftime('%d/%m/%Y %H:%M')
+            await sheets_request({
+                'aba': 'Compras',
+                'comprador': self.comprador,
+                'item': self.item.value,
+                'quantidade': self.quantidade.value,
+                'valor': self.valor.value,
+                'observacao': self.observacao.value or '-',
+                'registrado_em': registrado_em,
+            })
+
+            embed = discord.Embed(title='🛍️ Compra Registrada', color=0x9B59B6)
+            embed.add_field(name='👤 Comprador', value=self.comprador, inline=True)
+            embed.add_field(name='📅 Data', value=registrado_em, inline=True)
+            embed.add_field(name='📦 Item', value=self.item.value, inline=False)
+            embed.add_field(name='🔢 Quantidade', value=self.quantidade.value, inline=True)
+            embed.add_field(name='💵 Valor Pago', value=f'R$ {self.valor.value}', inline=True)
+            if self.observacao.value:
+                embed.add_field(name='📝 Observação', value=self.observacao.value, inline=False)
+
+            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            await interaction.followup.send(f'❌ Erro ao registrar compra: {e}', ephemeral=True)
+
+
+@bot.tree.command(name='compra', description='Registra uma nova compra')
+async def compra(interaction: discord.Interaction):
+    await interaction.response.send_modal(CompraModal(interaction.user.display_name))
+
+
+@bot.tree.command(name='compras_listar', description='Lista o histórico de compras')
+@discord.app_commands.describe(membro='Filtrar por membro (opcional)')
+async def compras_listar(interaction: discord.Interaction, membro: str = None):
+    await interaction.response.defer()
+    try:
+        resultado = await sheets_request({'aba': 'LerCompras', 'comprador': membro or ''})
+    except Exception as e:
+        await interaction.followup.send(f'❌ Erro ao buscar compras: {e}', ephemeral=True)
+        return
+
+    if not resultado or not isinstance(resultado, list):
+        msg = f'❌ Nenhuma compra encontrada para **{membro}**.' if membro else '❌ Nenhuma compra registrada ainda.'
+        await interaction.followup.send(msg, ephemeral=True)
+        return
+
+    titulo = f'🛍️ Compras de {membro}' if membro else '🛍️ Histórico de Compras'
+    embed = discord.Embed(title=titulo, color=0x9B59B6)
+
+    for c in resultado[-10:]:  # últimas 10
+        nome_campo = f"{c.get('item', '?')} ×{c.get('quantidade', '?')}"
+        valor_campo = f"👤 {c.get('comprador', '?')}\n💵 R$ {c.get('valor', '?')}\n📅 {c.get('registrado_em', '?')}"
+        if c.get('observacao') and c.get('observacao') != '-':
+            valor_campo += f"\n📝 {c.get('observacao')}"
+        embed.add_field(name=nome_campo, value=valor_campo, inline=False)
+
+    embed.set_footer(text='Mostrando as últimas 10 compras')
+    await interaction.followup.send(embed=embed)
+
+
 # ── ANIVERSÁRIOS ──────────────────────────────────────────────────────────────
 
 @tasks.loop(hours=4)
