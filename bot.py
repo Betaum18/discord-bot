@@ -354,6 +354,7 @@ async def craft_lista(interaction: discord.Interaction):
 # ── COMPRAS ───────────────────────────────────────────────────────────────────
 
 class CompraModal(discord.ui.Modal, title='Registro de Compra'):
+    familia = discord.ui.TextInput(label='Família', placeholder='Ex: Nome da família/fornecedor', required=True)
     item = discord.ui.TextInput(label='Item Comprado', placeholder='Ex: AK-47, Colete, Droga X', required=True)
     quantidade = discord.ui.TextInput(label='Quantidade', placeholder='Ex: 5', required=True)
     valor = discord.ui.TextInput(label='Valor Pago (R$)', placeholder='Ex: 15000', required=True)
@@ -370,6 +371,7 @@ class CompraModal(discord.ui.Modal, title='Registro de Compra'):
             await sheets_request({
                 'aba': 'Compras',
                 'comprador': self.comprador,
+                'familia': self.familia.value,
                 'item': self.item.value,
                 'quantidade': self.quantidade.value,
                 'valor': self.valor.value,
@@ -379,6 +381,7 @@ class CompraModal(discord.ui.Modal, title='Registro de Compra'):
 
             embed = discord.Embed(title='🛍️ Compra Registrada', color=0x9B59B6)
             embed.add_field(name='👤 Comprador', value=self.comprador, inline=True)
+            embed.add_field(name='🏠 Família', value=self.familia.value, inline=True)
             embed.add_field(name='📅 Data', value=registrado_em, inline=True)
             embed.add_field(name='📦 Item', value=self.item.value, inline=False)
             embed.add_field(name='🔢 Quantidade', value=self.quantidade.value, inline=True)
