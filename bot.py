@@ -351,6 +351,113 @@ async def craft_lista(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
+# ── PERÍMETROS ───────────────────────────────────────────────────────────────
+
+LOJAS: dict[str, tuple[int, str]] = {
+    'Vanilla':           (1,  'https://i.imgur.com/wqsv8Ly.jpeg'),
+    'Rodovia Arcanjos':  (2,  'https://i.imgur.com/IuQLhOY.jpeg'),
+    'Mirror Park':       (3,  'https://i.imgur.com/e9iEW0L.jpeg'),
+    'China':             (4,  'https://i.imgur.com/cFmcVeo.jpeg'),
+    'Guetos':            (5,  'https://i.imgur.com/snjrSC7.jpeg'),
+    'Central':           (6,  'https://i.imgur.com/Vkw61vq.jpeg'),
+    'Rodovia Praia':     (7,  'https://i.imgur.com/zz9txEG.jpeg'),
+    'Paleto':            (8,  'https://i.imgur.com/o4jYeHM.jpeg'),
+    'Rota 68 / Ark':     (9,  'https://i.imgur.com/hr7DUrk.jpeg'),
+    'Sandy Shores':      (10, 'https://i.imgur.com/GmRTRJg.jpeg'),
+    'Rodovia Presídio':  (11, 'https://i.imgur.com/rCCsh49.jpeg'),
+    'Grapeseed':         (12, 'https://i.imgur.com/eH4fBKx.png'),
+    'Naturalli':         (13, 'https://i.imgur.com/SzvaGkg.jpeg'),
+}
+
+ACOES: dict[str, str] = {
+    'Açougue':                        'https://i.imgur.com/w39tZ4X.png',
+    'Galinheiro':                     'https://i.imgur.com/kByVDF4.png',
+    'Madeireira':                     'https://i.imgur.com/Jmlpf03.png',
+    'Roubo à DP de Paleto':           'https://i.imgur.com/snXH0Zc.png',
+    'Joalheria':                      'https://i.imgur.com/qKaiusy.png',
+    'Fleeca - LifeInvader':           'https://i.imgur.com/9p6hybj.png',
+    'Fleeca - Shopping':              'https://i.imgur.com/ZwGzhnl.png',
+    'Fleeca - Rodovia Praia':         'https://i.imgur.com/4DSuduE.png',
+    'Fleeca - Banco Paleto':          'https://i.imgur.com/jsoLKDg.png',
+    'Fleeca - Vila do Chaves':        'https://i.imgur.com/A6s64PY.png',
+    'Fleeca - Rota 68':               'https://i.imgur.com/Lt28YZT.png',
+    'Banco Central':                  'https://i.imgur.com/dxG4MEF.png',
+    'Transferência para Penitenciária': 'https://i.imgur.com/stFRtuQ.png',
+    'Assalto ao Aeroporto do Norte':  'https://i.imgur.com/RGLERWY.png',
+    'Assalto ao Ferro Velho (Sul)':   'https://i.imgur.com/RTofdQF.png',
+    'Assalto ao Ferro Velho (Norte)': 'https://i.imgur.com/VKaegmS.png',
+    'Plataforma de Petróleo':         'https://i.imgur.com/jBW9Mpn.png',
+    'Assalto à Ilha':                 'https://i.imgur.com/JFsiwzS.png',
+    'Blackout na Cidade':             'https://i.imgur.com/q6X9w2d.png',
+    'Assalto ao Zancudo':             'https://i.imgur.com/Y2Mj0li.png',
+}
+
+
+async def perimetro_autocomplete(interaction: discord.Interaction, current: str) -> list:
+    tipo = getattr(interaction.namespace, 'tipo', None)
+    if tipo == 'loja':
+        choices = [
+            discord.app_commands.Choice(name=f'Loja {num} - {nome}', value=nome)
+            for nome, (num, _) in LOJAS.items()
+            if current.lower() in nome.lower()
+        ]
+    elif tipo == 'acao':
+        choices = [
+            discord.app_commands.Choice(name=nome, value=nome)
+            for nome in ACOES
+            if current.lower() in nome.lower()
+        ]
+    else:
+        choices = [
+            discord.app_commands.Choice(name=f'Loja {num} - {nome}', value=f'loja:{nome}')
+            for nome, (num, _) in LOJAS.items()
+            if current.lower() in nome.lower()
+        ] + [
+            discord.app_commands.Choice(name=f'Ação - {nome}', value=f'acao:{nome}')
+            for nome in ACOES
+            if current.lower() in nome.lower()
+        ]
+    return choices[:25]
+
+
+@bot.tree.command(name='perimetro_lista', description='Lista todos os perímetros disponíveis')
+async def perimetro_lista(interaction: discord.Interaction):
+    lojas_txt = '\n'.join(f'`{num:02d}` {nome}' for nome, (num, _) in LOJAS.items())
+    acoes_txt = '\n'.join(f'• {nome}' for nome in ACOES)
+
+    embed = discord.Embed(title='📋 Perímetros Disponíveis', color=0x3498DB)
+    embed.add_field(name='🏪 Lojas', value=lojas_txt, inline=True)
+    embed.add_field(name='🔫 Ações Médias/Grandes', value=acoes_txt, inline=True)
+    embed.set_footer(text='Use /perimetro para ver o mapa de cada um')
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name='perimetro', description='Mostra o perímetro de uma loja ou ação média/grande')
+@discord.app_commands.describe(tipo='Tipo de perímetro', nome='Nome da loja ou ação')
+@discord.app_commands.choices(tipo=[
+    discord.app_commands.Choice(name='Loja', value='loja'),
+    discord.app_commands.Choice(name='Ação Média/Grande', value='acao'),
+])
+@discord.app_commands.autocomplete(nome=perimetro_autocomplete)
+async def perimetro(interaction: discord.Interaction, tipo: str, nome: str):
+    if tipo == 'loja':
+        dados = LOJAS.get(nome)
+        if not dados:
+            await interaction.response.send_message('❌ Loja não encontrada.', ephemeral=True)
+            return
+        num, imagem = dados
+        embed = discord.Embed(title=f'🏪 Loja {num} - {nome}', color=0xE74C3C)
+    else:
+        imagem = ACOES.get(nome)
+        if not imagem:
+            await interaction.response.send_message('❌ Ação não encontrada.', ephemeral=True)
+            return
+        embed = discord.Embed(title=f'🔫 {nome}', color=0xE67E22)
+
+    embed.set_image(url=imagem)
+    await interaction.response.send_message(embed=embed)
+
+
 # ── COMPRAS ───────────────────────────────────────────────────────────────────
 
 class CompraModal(discord.ui.Modal, title='Registro de Compra'):
