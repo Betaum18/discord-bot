@@ -613,8 +613,10 @@ class VendaMunicaoModal(discord.ui.Modal, title='Venda de Munição'):
                 'registrado_em': registrado_em,
             })
 
+            total_muni = quantidade * 250
+
             embed = discord.Embed(title='🔫 Venda de Munição Registrada', color=0xE74C3C)
-            embed.add_field(name='📦 Munição', value=f'{MUNICAO_LABEL[self.tipo_municao]} ×{quantidade}', inline=True)
+            embed.add_field(name='📦 Munição', value=f'{MUNICAO_LABEL[self.tipo_municao]}\n{quantidade} craft(s) = {total_muni:,} unidades', inline=True)
             embed.add_field(name='👤 Comprador', value=f'{self.nome_comprador.value} ({self.tipo_comprador})', inline=True)
             embed.add_field(name='🧑‍💼 Vendedor', value=self.vendedor, inline=True)
 
@@ -683,8 +685,9 @@ class MunicaoTipoSelect(discord.ui.Select):
         embed = discord.Embed(
             title=f'🔫 Venda de Munição — {MUNICAO_LABEL[tipo]}',
             description=(
-                f'**Preço limpo:** R$ {preco}/caixa\n'
-                f'**Custo por caixa:** {mat["dinheiro_sujo"]} sujo • {mat["estojo"]} (250x) • {mat["polvora"]} pólvoras'
+                f'**1 craft = 250 munições**\n'
+                f'**Preço limpo:** R$ {preco} por craft\n'
+                f'**Custo por craft:** {mat["dinheiro_sujo"]} sujo • {mat["estojo"]} (250x) • {mat["polvora"]} pólvoras'
             ),
             color=0xE74C3C,
         )
@@ -745,7 +748,11 @@ async def vendas_municao_listar(interaction: discord.Interaction, tipo: str = No
     for v in resultado[-10:]:
         tipo_v = MUNICAO_LABEL.get(v.get('tipo_municao', ''), v.get('tipo_municao', '?'))
         qtd = v.get('quantidade', '?')
-        nome_campo = f'{tipo_v} ×{qtd}'
+        try:
+            total_muni = int(qtd) * 250
+            nome_campo = f'{tipo_v} — {qtd} craft(s) = {total_muni:,} unid.'
+        except (ValueError, TypeError):
+            nome_campo = f'{tipo_v} ×{qtd}'
         pag = v.get('pagamento', '?')
         perc = v.get('percentual_sujo', 0)
         pag_txt = f'Sujo (+{perc}%)' if pag == 'sujo' else 'Limpo'
