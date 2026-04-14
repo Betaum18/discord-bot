@@ -535,6 +535,233 @@ async def compras_listar(interaction: discord.Interaction, membro: str = None):
     await interaction.followup.send(embed=embed)
 
 
+# ── VENDA DE MUNIÇÃO ─────────────────────────────────────────────────────────
+
+MUNICAO_PRECOS = {
+    'pistola': 90,
+    'sub': 135,
+    'fuzil': 180,
+}
+
+MUNICAO_MATERIAIS = {
+    'pistola': {'dinheiro_sujo': 250, 'estojo': 'Estojo de Munição',            'polvora': 24},
+    'sub':     {'dinheiro_sujo': 400, 'estojo': 'Estojo de Munição Automática', 'polvora': 30},
+    'fuzil':   {'dinheiro_sujo': 500, 'estojo': 'Estojo de Munição Automática', 'polvora': 48},
+}
+
+MUNICAO_LABEL = {
+    'pistola': 'Pistola',
+    'sub':     'Sub',
+    'fuzil':   'Fuzil',
+}
+
+
+class VendaMunicaoModal(discord.ui.Modal, title='Venda de Munição'):
+    nome_comprador = discord.ui.TextInput(label='Nome do Comprador', placeholder='Ex: João Silva', required=True)
+    quantidade = discord.ui.TextInput(label='Quantidade (caixas)', placeholder='Ex: 10', required=True)
+    pagamento = discord.ui.TextInput(label='Pagamento', placeholder='limpo  ou  sujo', required=True)
+    desconto = discord.ui.TextInput(label='Desconto (%)', placeholder='0', default='0', required=False)
+    percentual_sujo = discord.ui.TextInput(label='% Sujo (0 se pagamento limpo)', placeholder='Ex: 50 para +50%', default='0', required=False)
+
+    def __init__(self, tipo_municao: str, tipo_comprador: str, vendedor: str):
+        super().__init__()
+        self.tipo_municao = tipo_municao
+        self.tipo_comprador = tipo_comprador
+        self.vendedor = vendedor
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        try:
+            quantidade = int(self.quantidade.value)
+            if quantidade < 1:
+                await interaction.followup.send('❌ Quantidade deve ser pelo menos 1.', ephemeral=True)
+                return
+
+            pagamento = self.pagamento.value.strip().lower()
+            if pagamento not in ('limpo', 'sujo'):
+                await interaction.followup.send('❌ Pagamento deve ser "limpo" ou "sujo".', ephemeral=True)
+                return
+
+            desconto = float((self.desconto.value or '0').replace(',', '.'))
+            percentual_sujo = float((self.percentual_sujo.value or '0').replace(',', '.'))
+
+            preco_base = MUNICAO_PRECOS[self.tipo_municao] * quantidade
+            if pagamento == 'sujo':
+                preco_total = preco_base * (1 + percentual_sujo / 100)
+            else:
+                preco_total = preco_base
+            preco_final = preco_total * (1 - desconto / 100)
+
+            mat = MUNICAO_MATERIAIS[self.tipo_municao]
+            mat_dinheiro_sujo = mat['dinheiro_sujo'] * quantidade
+            mat_estojo = 250 * quantidade
+            mat_polvora = mat['polvora'] * quantidade
+
+            registrado_em = datetime.now().strftime('%d/%m/%Y %H:%M')
+
+            await sheets_request({
+                'aba': 'VendaMunicao',
+                'tipo_municao': self.tipo_municao,
+                'nome_comprador': self.nome_comprador.value,
+                'tipo_comprador': self.tipo_comprador,
+                'quantidade': quantidade,
+                'pagamento': pagamento,
+                'percentual_sujo': percentual_sujo,
+                'desconto': desconto,
+                'preco_final': round(preco_final, 2),
+                'vendedor': self.vendedor,
+                'registrado_em': registrado_em,
+            })
+
+            embed = discord.Embed(title='🔫 Venda de Munição Registrada', color=0xE74C3C)
+            embed.add_field(name='📦 Munição', value=f'{MUNICAO_LABEL[self.tipo_municao]} ×{quantidade}', inline=True)
+            embed.add_field(name='👤 Comprador', value=f'{self.nome_comprador.value} ({self.tipo_comprador})', inline=True)
+            embed.add_field(name='🧑‍💼 Vendedor', value=self.vendedor, inline=True)
+
+            pagamento_txt = f'Sujo (+{percentual_sujo:.0f}%)' if pagamento == 'sujo' else 'Limpo'
+            embed.add_field(name='💳 Pagamento', value=pagamento_txt, inline=True)
+            if desconto > 0:
+                embed.add_field(name='🏷️ Desconto', value=f'{desconto:.0f}%', inline=True)
+            embed.add_field(name='💰 Preço Final', value=f'R$ {preco_final:,.2f}', inline=True)
+
+            mat_txt = (
+                f'💸 Dinheiro Sujo (craft): {mat_dinheiro_sujo:,}\n'
+                f'📦 {mat["estojo"]}: {mat_estojo:,}\n'
+                f'💣 Pólvoras: {mat_polvora:,}'
+            )
+            embed.add_field(name='🔩 Materiais Consumidos', value=mat_txt, inline=False)
+            embed.set_footer(text=f'Registrado em {registrado_em}')
+
+            await interaction.followup.send(embed=embed)
+        except ValueError:
+            await interaction.followup.send(
+                '❌ Valores inválidos. Verifique quantidade, desconto e percentual.',
+                ephemeral=True,
+            )
+        except Exception as e:
+            await interaction.followup.send(f'❌ Erro ao registrar venda: {e}', ephemeral=True)
+
+
+class CompradorTipoSelect(discord.ui.Select):
+    def __init__(self, tipo_municao: str, vendedor: str):
+        self.tipo_municao = tipo_municao
+        self.vendedor_nome = vendedor
+        options = [
+            discord.SelectOption(label='CPF',      value='CPF'),
+            discord.SelectOption(label='CNPJ',     value='CNPJ'),
+            discord.SelectOption(label='Aliança',  value='Aliança'),
+            discord.SelectOption(label='Parceria', value='Parceria'),
+        ]
+        super().__init__(placeholder='Selecione o tipo de comprador...', min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(
+            VendaMunicaoModal(self.tipo_municao, self.values[0], self.vendedor_nome)
+        )
+
+
+class CompradorTipoView(discord.ui.View):
+    def __init__(self, tipo_municao: str, vendedor: str):
+        super().__init__()
+        self.add_item(CompradorTipoSelect(tipo_municao, vendedor))
+
+
+class MunicaoTipoSelect(discord.ui.Select):
+    def __init__(self, vendedor: str):
+        self.vendedor_nome = vendedor
+        options = [
+            discord.SelectOption(label='Pistola', value='pistola'),
+            discord.SelectOption(label='Sub',     value='sub'),
+            discord.SelectOption(label='Fuzil',   value='fuzil'),
+        ]
+        super().__init__(placeholder='Selecione o tipo de munição...', min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        tipo = self.values[0]
+        preco = MUNICAO_PRECOS[tipo]
+        mat = MUNICAO_MATERIAIS[tipo]
+        embed = discord.Embed(
+            title=f'🔫 Venda de Munição — {MUNICAO_LABEL[tipo]}',
+            description=(
+                f'**Preço limpo:** R$ {preco}/caixa\n'
+                f'**Custo por caixa:** {mat["dinheiro_sujo"]} sujo • {mat["estojo"]} (250x) • {mat["polvora"]} pólvoras'
+            ),
+            color=0xE74C3C,
+        )
+        embed.set_footer(text='Selecione o tipo de comprador:')
+        await interaction.response.edit_message(embed=embed, view=CompradorTipoView(tipo, self.vendedor_nome))
+
+
+class MunicaoTipoView(discord.ui.View):
+    def __init__(self, vendedor: str):
+        super().__init__()
+        self.add_item(MunicaoTipoSelect(vendedor))
+
+
+@bot.tree.command(name='venda_municao', description='Registra uma venda de munição (pistola, sub ou fuzil)')
+async def venda_municao(interaction: discord.Interaction):
+    vendedor = interaction.user.display_name
+    embed = discord.Embed(title='🔫 Venda de Munição', description='Selecione o tipo de munição:', color=0xE74C3C)
+    await interaction.response.send_message(embed=embed, view=MunicaoTipoView(vendedor), ephemeral=True)
+
+
+@bot.tree.command(name='vendas_municao_listar', description='Lista o histórico de vendas de munição')
+@discord.app_commands.describe(tipo='Filtrar por tipo de munição', comprador='Filtrar por nome do comprador')
+@discord.app_commands.choices(tipo=[
+    discord.app_commands.Choice(name='Pistola', value='pistola'),
+    discord.app_commands.Choice(name='Sub',     value='sub'),
+    discord.app_commands.Choice(name='Fuzil',   value='fuzil'),
+])
+async def vendas_municao_listar(interaction: discord.Interaction, tipo: str = None, comprador: str = None):
+    await interaction.response.defer()
+    try:
+        resultado = await sheets_request({
+            'aba': 'LerVendaMunicao',
+            'tipo_municao': tipo or '',
+            'comprador': comprador or '',
+        })
+    except Exception as e:
+        await interaction.followup.send(f'❌ Erro ao buscar vendas: {e}', ephemeral=True)
+        return
+
+    if not resultado or not isinstance(resultado, list):
+        filtros = []
+        if tipo:
+            filtros.append(f'tipo: **{tipo}**')
+        if comprador:
+            filtros.append(f'comprador: **{comprador}**')
+        msg = '❌ Nenhuma venda encontrada' + (f' com {" e ".join(filtros)}.' if filtros else '.')
+        await interaction.followup.send(msg, ephemeral=True)
+        return
+
+    partes = []
+    if tipo:
+        partes.append(MUNICAO_LABEL[tipo])
+    if comprador:
+        partes.append(comprador)
+    titulo = '🔫 Vendas de Munição' + (f' — {" | ".join(partes)}' if partes else '')
+
+    embed = discord.Embed(title=titulo, color=0xE74C3C)
+    for v in resultado[-10:]:
+        tipo_v = MUNICAO_LABEL.get(v.get('tipo_municao', ''), v.get('tipo_municao', '?'))
+        qtd = v.get('quantidade', '?')
+        nome_campo = f'{tipo_v} ×{qtd}'
+        pag = v.get('pagamento', '?')
+        perc = v.get('percentual_sujo', 0)
+        pag_txt = f'Sujo (+{perc}%)' if pag == 'sujo' else 'Limpo'
+        valor_campo = (
+            f"👤 {v.get('nome_comprador', '?')} ({v.get('tipo_comprador', '?')})\n"
+            f"💳 {pag_txt}\n"
+            f"💰 R$ {v.get('preco_final', '?')}\n"
+            f"🧑‍💼 {v.get('vendedor', '?')}\n"
+            f"📅 {v.get('registrado_em', '?')}"
+        )
+        embed.add_field(name=nome_campo, value=valor_campo, inline=False)
+
+    embed.set_footer(text='Mostrando as últimas 10 vendas')
+    await interaction.followup.send(embed=embed)
+
+
 # ── ANIVERSÁRIOS ──────────────────────────────────────────────────────────────
 
 @tasks.loop(hours=4)

@@ -102,6 +102,67 @@ function doGet(e) {
       }
     }
     return ContentService.createTextOutput(JSON.stringify(listaAniv)).setMimeType(ContentService.MimeType.JSON);
+
+  } else if (data.aba == "Compras") {
+    var wsComp = ss.getSheetByName("Compras") || ss.insertSheet("Compras");
+    if (wsComp.getLastRow() == 0) wsComp.appendRow(["Comprador", "Família", "Item", "Quantidade", "Valor", "Observação", "Registrado em"]);
+    wsComp.appendRow([data.comprador, data.familia, data.item, data.quantidade, data.valor, data.observacao, data.registrado_em]);
+
+  } else if (data.aba == "LerCompras") {
+    var wsComp2 = ss.getSheetByName("Compras");
+    if (!wsComp2 || wsComp2.getLastRow() <= 1) {
+      return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+    }
+    var rowsComp = wsComp2.getRange(2, 1, wsComp2.getLastRow() - 1, 7).getValues();
+    var listaComp = [];
+    for (var i = 0; i < rowsComp.length; i++) {
+      var r = rowsComp[i];
+      if (r[0] == "") continue;
+      if (data.comprador && data.comprador != "" && r[0] != data.comprador) continue;
+      listaComp.push({
+        comprador:    r[0],
+        familia:      r[1],
+        item:         r[2],
+        quantidade:   r[3],
+        valor:        r[4],
+        observacao:   r[5],
+        registrado_em: r[6]
+      });
+    }
+    return ContentService.createTextOutput(JSON.stringify(listaComp)).setMimeType(ContentService.MimeType.JSON);
+
+  } else if (data.aba == "VendaMunicao") {
+    var wsMun = ss.getSheetByName("VendaMunicao") || ss.insertSheet("VendaMunicao");
+    if (wsMun.getLastRow() == 0) wsMun.appendRow(["Tipo", "Comprador", "Tipo Comprador", "Quantidade", "Pagamento", "% Sujo", "Desconto (%)", "Preço Final", "Vendedor", "Registrado em"]);
+    wsMun.appendRow([data.tipo_municao, data.nome_comprador, data.tipo_comprador, data.quantidade, data.pagamento, data.percentual_sujo, data.desconto, data.preco_final, data.vendedor, data.registrado_em]);
+
+  } else if (data.aba == "LerVendaMunicao") {
+    var wsMun2 = ss.getSheetByName("VendaMunicao");
+    if (!wsMun2 || wsMun2.getLastRow() <= 1) {
+      return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+    }
+    var rowsMun = wsMun2.getRange(2, 1, wsMun2.getLastRow() - 1, 10).getValues();
+    var listaMun = [];
+    for (var i = 0; i < rowsMun.length; i++) {
+      var r = rowsMun[i];
+      if (r[0] == "") continue;
+      if (data.tipo_municao && data.tipo_municao != "" && r[0] != data.tipo_municao) continue;
+      if (data.comprador && data.comprador != "" && r[1].toString().toLowerCase().indexOf(data.comprador.toLowerCase()) == -1) continue;
+      listaMun.push({
+        tipo_municao:    r[0],
+        nome_comprador:  r[1],
+        tipo_comprador:  r[2],
+        quantidade:      r[3],
+        pagamento:       r[4],
+        percentual_sujo: r[5],
+        desconto:        r[6],
+        preco_final:     r[7],
+        vendedor:        r[8],
+        registrado_em:   r[9]
+      });
+    }
+    return ContentService.createTextOutput(JSON.stringify(listaMun)).setMimeType(ContentService.MimeType.JSON);
+
   }
 
   return ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON);
