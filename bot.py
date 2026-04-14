@@ -558,7 +558,7 @@ MUNICAO_LABEL = {
 
 class VendaMunicaoModal(discord.ui.Modal, title='Venda de Munição'):
     nome_comprador = discord.ui.TextInput(label='Nome do Comprador', placeholder='Ex: João Silva', required=True)
-    quantidade = discord.ui.TextInput(label='Quantidade (caixas)', placeholder='Ex: 10', required=True)
+    quantidade = discord.ui.TextInput(label='Quantidade (unidades)', placeholder='Ex: 500', required=True)
     pagamento = discord.ui.TextInput(label='Pagamento', placeholder='limpo  ou  sujo', required=True)
     desconto = discord.ui.TextInput(label='Desconto (%)', placeholder='0', default='0', required=False)
     percentual_sujo = discord.ui.TextInput(label='% Sujo (0 se pagamento limpo)', placeholder='Ex: 50 para +50%', default='0', required=False)
@@ -592,10 +592,12 @@ class VendaMunicaoModal(discord.ui.Modal, title='Venda de Munição'):
                 preco_total = preco_base
             preco_final = preco_total * (1 - desconto / 100)
 
+            crafts = -(-quantidade // 250)  # ceil(quantidade / 250)
+
             mat = MUNICAO_MATERIAIS[self.tipo_municao]
-            mat_dinheiro_sujo = mat['dinheiro_sujo'] * quantidade
-            mat_estojo = 250 * quantidade
-            mat_polvora = mat['polvora'] * quantidade
+            mat_dinheiro_sujo = mat['dinheiro_sujo'] * crafts
+            mat_estojo = 250 * crafts
+            mat_polvora = mat['polvora'] * crafts
 
             registrado_em = datetime.now().strftime('%d/%m/%Y %H:%M')
 
@@ -613,10 +615,8 @@ class VendaMunicaoModal(discord.ui.Modal, title='Venda de Munição'):
                 'registrado_em': registrado_em,
             })
 
-            total_muni = quantidade * 250
-
             embed = discord.Embed(title='🔫 Venda de Munição Registrada', color=0xE74C3C)
-            embed.add_field(name='📦 Munição', value=f'{MUNICAO_LABEL[self.tipo_municao]}\n{quantidade} craft(s) = {total_muni:,} unidades', inline=True)
+            embed.add_field(name='📦 Munição', value=f'{MUNICAO_LABEL[self.tipo_municao]}\n{quantidade:,} unidades ({crafts} craft(s))', inline=True)
             embed.add_field(name='👤 Comprador', value=f'{self.nome_comprador.value} ({self.tipo_comprador})', inline=True)
             embed.add_field(name='🧑‍💼 Vendedor', value=self.vendedor, inline=True)
 
@@ -685,8 +685,8 @@ class MunicaoTipoSelect(discord.ui.Select):
         embed = discord.Embed(
             title=f'🔫 Venda de Munição — {MUNICAO_LABEL[tipo]}',
             description=(
-                f'**1 craft = 250 munições**\n'
-                f'**Preço limpo:** R$ {preco} por craft\n'
+                f'**Preço limpo:** R$ {preco} por unidade\n'
+                f'**Craft:** 1 craft = 250 unidades\n'
                 f'**Custo por craft:** {mat["dinheiro_sujo"]} sujo • {mat["estojo"]} (250x) • {mat["polvora"]} pólvoras'
             ),
             color=0xE74C3C,
@@ -749,8 +749,9 @@ async def vendas_municao_listar(interaction: discord.Interaction, tipo: str = No
         tipo_v = MUNICAO_LABEL.get(v.get('tipo_municao', ''), v.get('tipo_municao', '?'))
         qtd = v.get('quantidade', '?')
         try:
-            total_muni = int(qtd) * 250
-            nome_campo = f'{tipo_v} — {qtd} craft(s) = {total_muni:,} unid.'
+            qtd_int = int(qtd)
+            crafts_v = -(-qtd_int // 250)
+            nome_campo = f'{tipo_v} — {qtd_int:,} unid. ({crafts_v} craft(s))'
         except (ValueError, TypeError):
             nome_campo = f'{tipo_v} ×{qtd}'
         pag = v.get('pagamento', '?')
