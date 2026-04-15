@@ -701,6 +701,35 @@ class MunicaoTipoView(discord.ui.View):
         self.add_item(MunicaoTipoSelect(vendedor))
 
 
+@bot.tree.command(name='municao_preco_editar', description='Altera o preço de venda de um tipo de munição')
+@discord.app_commands.describe(tipo='Tipo de munição', preco='Novo preço por unidade (R$)')
+@discord.app_commands.choices(tipo=[
+    discord.app_commands.Choice(name='Pistola', value='pistola'),
+    discord.app_commands.Choice(name='Sub',     value='sub'),
+    discord.app_commands.Choice(name='Fuzil',   value='fuzil'),
+])
+async def municao_preco_editar(interaction: discord.Interaction, tipo: str, preco: float):
+    if preco <= 0:
+        await interaction.response.send_message('❌ O preço deve ser maior que zero.', ephemeral=True)
+        return
+    preco_anterior = MUNICAO_PRECOS[tipo]
+    MUNICAO_PRECOS[tipo] = preco
+    embed = discord.Embed(title='💲 Preço de Munição Atualizado', color=0x2ECC71)
+    embed.add_field(name='📦 Tipo', value=MUNICAO_LABEL[tipo], inline=True)
+    embed.add_field(name='Preço Anterior', value=f'R$ {preco_anterior:.2f}', inline=True)
+    embed.add_field(name='Novo Preço', value=f'R$ {preco:.2f}', inline=True)
+    embed.set_footer(text='⚠️ Alteração válida até o próximo reinício do bot.')
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name='municao_precos', description='Exibe os preços atuais de venda de munição')
+async def municao_precos(interaction: discord.Interaction):
+    embed = discord.Embed(title='💲 Preços de Munição', color=0x3498DB)
+    for tipo, label in MUNICAO_LABEL.items():
+        embed.add_field(name=label, value=f'R$ {MUNICAO_PRECOS[tipo]:.2f}/unid.', inline=True)
+    await interaction.response.send_message(embed=embed)
+
+
 @bot.tree.command(name='venda_municao', description='Registra uma venda de munição (pistola, sub ou fuzil)')
 async def venda_municao(interaction: discord.Interaction):
     vendedor = interaction.user.display_name
