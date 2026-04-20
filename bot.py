@@ -539,7 +539,7 @@ async def compras_listar(interaction: discord.Interaction, membro: str = None):
 
 MUNICAO_PRECOS = {
     'pistola': 90,
-    'sub': 135,
+    'sub': 120,
     'fuzil': 165,
 }
 
