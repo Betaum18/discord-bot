@@ -793,10 +793,15 @@ class EntregaModal(discord.ui.Modal, title='Registrar Entrega'):
     qtd_fuzil = discord.ui.TextInput(label='Qtd Fuzil entregue', placeholder='0', default='0', required=False)
     observacao = discord.ui.TextInput(label='Observação (opcional)', placeholder='Ex: entrega parcial, falta de estoque', required=False)
 
-    def __init__(self, encomenda_id: str, comprador: str):
+    def __init__(self, encomenda_id: str, encomenda: dict):
         super().__init__()
         self.encomenda_id = encomenda_id
-        self.comprador = comprador
+        self.comprador = encomenda.get('comprador', '?')
+        self._restante = {
+            'pistola': int(encomenda.get('pistola_total', 0)) - int(encomenda.get('pistola_entregue', 0)),
+            'sub':     int(encomenda.get('sub_total',     0)) - int(encomenda.get('sub_entregue',     0)),
+            'fuzil':   int(encomenda.get('fuzil_total',   0)) - int(encomenda.get('fuzil_entregue',   0)),
+        }
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -810,6 +815,20 @@ class EntregaModal(discord.ui.Modal, title='Registrar Entrega'):
 
         if qtd_p + qtd_s + qtd_f == 0:
             await interaction.followup.send('❌ Informe ao menos uma quantidade entregue.', ephemeral=True)
+            return
+
+        erros = []
+        if qtd_p > self._restante['pistola']:
+            erros.append(f'Pistola: informado {qtd_p:,}, restante {self._restante["pistola"]:,}')
+        if qtd_s > self._restante['sub']:
+            erros.append(f'Sub: informado {qtd_s:,}, restante {self._restante["sub"]:,}')
+        if qtd_f > self._restante['fuzil']:
+            erros.append(f'Fuzil: informado {qtd_f:,}, restante {self._restante["fuzil"]:,}')
+        if erros:
+            await interaction.followup.send(
+                '❌ Quantidade informada supera o saldo da encomenda:\n' + '\n'.join(erros),
+                ephemeral=True,
+            )
             return
 
         try:
@@ -867,7 +886,7 @@ class EncomendaSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         eid = self.values[0]
         enc = self._encomendas_map.get(eid, {})
-        await interaction.response.send_modal(EntregaModal(eid, enc.get('comprador', '?')))
+        await interaction.response.send_modal(EntregaModal(eid, enc))
 
 
 class EncomendaView(discord.ui.View):
