@@ -804,7 +804,7 @@ class EntregaModal(discord.ui.Modal, title='Registrar Entrega'):
         }
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=False)
         try:
             qtd_p = int((self.qtd_pistola.value or '0').strip() or '0')
             qtd_s = int((self.qtd_sub.value or '0').strip() or '0')
@@ -855,8 +855,8 @@ class EntregaModal(discord.ui.Modal, title='Registrar Entrega'):
             embed.add_field(name='📦 Entregue agora', value='\n'.join(partes), inline=False)
             if self.observacao.value:
                 embed.add_field(name='📝 Observação', value=self.observacao.value, inline=False)
-            embed.set_footer(text=f'Registrado em {registrado_em}')
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            embed.set_footer(text=f'Registrado em {registrado_em} • por {interaction.user.display_name}')
+            await interaction.followup.send(embed=embed)
         except Exception as e:
             await interaction.followup.send(f'❌ Erro ao registrar entrega: {e}', ephemeral=True)
 
