@@ -131,38 +131,129 @@ function doGet(e) {
     }
     return ContentService.createTextOutput(JSON.stringify(listaComp)).setMimeType(ContentService.MimeType.JSON);
 
+  // ── VENDA DE MUNIÇÃO (novo formato multi-tipo) ─────────────────────────────
   } else if (data.aba == "VendaMunicao") {
     var wsMun = ss.getSheetByName("VendaMunicao") || ss.insertSheet("VendaMunicao");
-    if (wsMun.getLastRow() == 0) wsMun.appendRow(["Tipo", "Comprador", "Tipo Comprador", "Quantidade", "Pagamento", "% Sujo", "Desconto (%)", "Preço Final", "Vendedor", "Registrado em"]);
-    wsMun.appendRow([data.tipo_municao, data.nome_comprador, data.tipo_comprador, data.quantidade, data.pagamento, data.percentual_sujo, data.desconto, data.preco_final, data.vendedor, data.registrado_em]);
+    if (wsMun.getLastRow() == 0) wsMun.appendRow(["Comprador", "Tipo Comprador", "Pistola", "Sub", "Fuzil", "Pagamento", "% Sujo", "Desconto (%)", "Preço Final", "Vendedor", "Registrado em"]);
+    wsMun.appendRow([data.nome_comprador, data.tipo_comprador, data.pistola || 0, data.sub || 0, data.fuzil || 0, data.pagamento, data.percentual_sujo, data.desconto, data.preco_final, data.vendedor, data.registrado_em]);
 
   } else if (data.aba == "LerVendaMunicao") {
     var wsMun2 = ss.getSheetByName("VendaMunicao");
     if (!wsMun2 || wsMun2.getLastRow() <= 1) {
       return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
     }
-    var rowsMun = wsMun2.getRange(2, 1, wsMun2.getLastRow() - 1, 10).getValues();
+    var rowsMun = wsMun2.getRange(2, 1, wsMun2.getLastRow() - 1, 11).getValues();
     var listaMun = [];
     for (var i = 0; i < rowsMun.length; i++) {
       var r = rowsMun[i];
       if (r[0] == "") continue;
-      if (data.tipo_municao && data.tipo_municao != "" && r[0] != data.tipo_municao) continue;
-      if (data.comprador && data.comprador != "" && r[1].toString().toLowerCase().indexOf(data.comprador.toLowerCase()) == -1) continue;
+      if (data.comprador && data.comprador != "" && r[0].toString().toLowerCase().indexOf(data.comprador.toLowerCase()) == -1) continue;
       listaMun.push({
-        tipo_municao:    r[0],
-        nome_comprador:  r[1],
-        tipo_comprador:  r[2],
-        quantidade:      r[3],
-        pagamento:       r[4],
-        percentual_sujo: r[5],
-        desconto:        r[6],
-        preco_final:     r[7],
-        vendedor:        r[8],
-        registrado_em:   r[9]
+        nome_comprador:  r[0],
+        tipo_comprador:  r[1],
+        pistola:         r[2],
+        sub:             r[3],
+        fuzil:           r[4],
+        pagamento:       r[5],
+        percentual_sujo: r[6],
+        desconto:        r[7],
+        preco_final:     r[8],
+        vendedor:        r[9],
+        registrado_em:   r[10]
       });
     }
     return ContentService.createTextOutput(JSON.stringify(listaMun)).setMimeType(ContentService.MimeType.JSON);
 
+  // ── PREÇOS ─────────────────────────────────────────────────────────────────
+  } else if (data.aba == "LerPrecos") {
+    var wsPrecos = ss.getSheetByName("Precos");
+    if (!wsPrecos || wsPrecos.getLastRow() <= 1) {
+      return ContentService.createTextOutput("{}").setMimeType(ContentService.MimeType.JSON);
+    }
+    var rowsPrecos = wsPrecos.getRange(2, 1, wsPrecos.getLastRow() - 1, 2).getValues();
+    var precos = {};
+    for (var i = 0; i < rowsPrecos.length; i++) {
+      if (rowsPrecos[i][0] != "") precos[rowsPrecos[i][0]] = rowsPrecos[i][1];
+    }
+    return ContentService.createTextOutput(JSON.stringify(precos)).setMimeType(ContentService.MimeType.JSON);
+
+  } else if (data.aba == "AtualizarPreco") {
+    var wsPrecos2 = ss.getSheetByName("Precos") || ss.insertSheet("Precos");
+    if (wsPrecos2.getLastRow() == 0) wsPrecos2.appendRow(["Tipo", "Preco"]);
+    var rowsP = wsPrecos2.getLastRow() > 1 ? wsPrecos2.getRange(2, 1, wsPrecos2.getLastRow() - 1, 2).getValues() : [];
+    var foundP = false;
+    for (var i = 0; i < rowsP.length; i++) {
+      if (rowsP[i][0] == data.tipo) {
+        wsPrecos2.getRange(i + 2, 2).setValue(data.preco);
+        foundP = true;
+        break;
+      }
+    }
+    if (!foundP) wsPrecos2.appendRow([data.tipo, data.preco]);
+
+  // ── ENCOMENDAS ─────────────────────────────────────────────────────────────
+  } else if (data.aba == "CriarEncomenda") {
+    var wsEnc = ss.getSheetByName("Encomendas") || ss.insertSheet("Encomendas");
+    if (wsEnc.getLastRow() == 0) wsEnc.appendRow(["ID", "Vendedor", "Comprador", "Tipo Comprador", "Pistola Total", "Sub Total", "Fuzil Total", "Total (R$)", "Pistola Entregue", "Sub Entregue", "Fuzil Entregue", "Status", "Registrado em"]);
+    var newId = String(Date.now());
+    wsEnc.appendRow([newId, data.vendedor, data.comprador, data.tipo_comprador, data.pistola || 0, data.sub || 0, data.fuzil || 0, data.total, 0, 0, 0, "Pendente", data.registrado_em]);
+
+  } else if (data.aba == "LerEncomendas") {
+    var wsEnc2 = ss.getSheetByName("Encomendas");
+    if (!wsEnc2 || wsEnc2.getLastRow() <= 1) {
+      return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+    }
+    var rowsEnc = wsEnc2.getRange(2, 1, wsEnc2.getLastRow() - 1, 13).getValues();
+    var listaEnc = [];
+    var filtro = data.status || "";
+    for (var i = 0; i < rowsEnc.length; i++) {
+      var r = rowsEnc[i];
+      if (r[0] == "") continue;
+      var st = r[11];
+      if (filtro == "abertas" && st == "Completa") continue;
+      if (filtro != "" && filtro != "abertas" && filtro != "todas" && st != filtro) continue;
+      listaEnc.push({
+        id:               String(r[0]),
+        vendedor:         r[1],
+        comprador:        r[2],
+        tipo_comprador:   r[3],
+        pistola_total:    r[4],
+        sub_total:        r[5],
+        fuzil_total:      r[6],
+        total:            r[7],
+        pistola_entregue: r[8],
+        sub_entregue:     r[9],
+        fuzil_entregue:   r[10],
+        status:           st,
+        registrado_em:    r[12]
+      });
+    }
+    return ContentService.createTextOutput(JSON.stringify(listaEnc)).setMimeType(ContentService.MimeType.JSON);
+
+  } else if (data.aba == "RegistrarEntrega") {
+    var wsEnc3 = ss.getSheetByName("Encomendas");
+    if (!wsEnc3) {
+      return ContentService.createTextOutput('{"status":"Erro: planilha não encontrada"}').setMimeType(ContentService.MimeType.JSON);
+    }
+    var rowsEnc3 = wsEnc3.getLastRow() > 1 ? wsEnc3.getRange(2, 1, wsEnc3.getLastRow() - 1, 13).getValues() : [];
+    for (var i = 0; i < rowsEnc3.length; i++) {
+      if (String(rowsEnc3[i][0]) == String(data.id)) {
+        var rowNum = i + 2;
+        var pistTotal  = Number(rowsEnc3[i][4]);
+        var subTotal   = Number(rowsEnc3[i][5]);
+        var fuzilTotal = Number(rowsEnc3[i][6]);
+        var pistEnt    = Math.min(Number(rowsEnc3[i][8])  + Number(data.pistola || 0), pistTotal);
+        var subEnt     = Math.min(Number(rowsEnc3[i][9])  + Number(data.sub     || 0), subTotal);
+        var fuzilEnt   = Math.min(Number(rowsEnc3[i][10]) + Number(data.fuzil   || 0), fuzilTotal);
+        wsEnc3.getRange(rowNum, 9, 1, 3).setValues([[pistEnt, subEnt, fuzilEnt]]);
+        var completo = (pistEnt >= pistTotal) && (subEnt >= subTotal) && (fuzilEnt >= fuzilTotal);
+        var algumEntregue = pistEnt > 0 || subEnt > 0 || fuzilEnt > 0;
+        var newStatus = completo ? "Completa" : (algumEntregue ? "Parcial" : "Pendente");
+        wsEnc3.getRange(rowNum, 12).setValue(newStatus);
+        return ContentService.createTextOutput(JSON.stringify({status: newStatus})).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    return ContentService.createTextOutput('{"status":"Erro: encomenda não encontrada"}').setMimeType(ContentService.MimeType.JSON);
   }
 
   return ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON);
