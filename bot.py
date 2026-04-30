@@ -1,6 +1,9 @@
 import os
 import re
 import discord
+from dotenv import load_dotenv
+
+load_dotenv()
 from discord.ext import commands, tasks
 from datetime import datetime
 import aiohttp
