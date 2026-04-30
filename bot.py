@@ -3,7 +3,7 @@ import re
 import discord
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 from discord.ext import commands, tasks
 from datetime import datetime
 import aiohttp
@@ -1117,7 +1117,10 @@ async def start_webserver():
     await site.start()
 
 async def main():
+    token = os.getenv('DISCORD_TOKEN')
+    if not token:
+        raise RuntimeError('DISCORD_TOKEN não encontrado. Verifique o arquivo .env')
     await start_webserver()
-    await bot.start(os.environ['DISCORD_TOKEN'])
+    await bot.start(token)
 
 asyncio.run(main())
